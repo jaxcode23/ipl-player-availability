@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from ..domain.events import EventCreate
 from ..parsers.base import ParsedRecord
+from .models import NormalizedRecord
 
 
 class BaseNormalizer(ABC):
@@ -10,4 +10,4 @@ class BaseNormalizer(ABC):
     def name(self) -> str: ...
 
     @abstractmethod
-    def normalize(self, records: list[ParsedRecord]) -> list[EventCreate]: ...
+    def normalize(self, records: list[ParsedRecord]) -> list[NormalizedRecord]: ...

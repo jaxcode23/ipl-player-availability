@@ -153,8 +153,12 @@ class TestDetermineConfidence:
         text = "expected to be out"
         assert determine_confidence(text) == ConfidenceLevel.MEDIUM
 
-    def test_low_overrides_all(self) -> None:
+    def test_high_takes_precedence_over_ruling_out_low(self) -> None:
         text = "speculation that he is ruled out"
+        assert determine_confidence(text) == ConfidenceLevel.HIGH
+
+    def test_low_takes_precedence_when_no_high_phrase(self) -> None:
+        text = "speculation that he may miss the match"
         assert determine_confidence(text) == ConfidenceLevel.LOW
 
 

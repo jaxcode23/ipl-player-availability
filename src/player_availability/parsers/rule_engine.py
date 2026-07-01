@@ -324,13 +324,13 @@ def extract_effective_date(text: str, published_at: date) -> date | None:
 def determine_confidence(text: str, event_type: EventType | None = None) -> ConfidenceLevel:
     text_lower = text.lower()
 
-    for phrase in LOW_CONFIDENCE_PHRASES:
-        if phrase in text_lower:
-            return ConfidenceLevel.LOW
-
     for phrase in HIGH_CONFIDENCE_PHRASES:
         if phrase in text_lower:
             return ConfidenceLevel.HIGH
+
+    for phrase in LOW_CONFIDENCE_PHRASES:
+        if phrase in text_lower:
+            return ConfidenceLevel.LOW
 
     for phrase in MEDIUM_CONFIDENCE_PHRASES:
         if phrase in text_lower:

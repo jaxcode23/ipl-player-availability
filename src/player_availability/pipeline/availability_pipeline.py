@@ -8,7 +8,10 @@ from ..collectors.exceptions import CollectError
 from ..db.repository import AbstractRepository
 from ..domain.events import EventCreate
 from ..normalizers.base import BaseNormalizer
-from ..normalizers.exceptions import NormalizeError
+from ..normalizers.exceptions import NormalizeError, UnresolvedPlayerError
+from ..normalizers.mapper import normalized_to_event_create
+from ..normalizers.models import NormalizedRecord
+from ..normalizers.resolver import PlayerResolver
 from ..parsers.base import BaseParser, ParsedRecord
 from ..parsers.exceptions import ParseError
 
@@ -29,19 +32,21 @@ class AvailabilityPipeline:
         parsers: Sequence[BaseParser],
         normalizers: Sequence[BaseNormalizer],
         repository: AbstractRepository,
+        player_resolver: PlayerResolver | None = None,
     ) -> None:
         self._collectors = collectors
         self._parsers = parsers
         self._normalizers = normalizers
         self._repository = repository
+        self._player_resolver = player_resolver
 
     def run(self) -> PipelineResult:
         result = PipelineResult()
 
         raw_data = self._collect(result)
         parsed = self._parse(raw_data, result)
-        events = self._normalize(parsed, result)
-        self._store(events, result)
+        normalized = self._normalize(parsed, result)
+        self._store(normalized, result)
 
         return result
 
@@ -82,26 +87,47 @@ class AvailabilityPipeline:
         self,
         records: list[ParsedRecord],
         result: PipelineResult,
-    ) -> list[EventCreate]:
-        all_events: list[EventCreate] = []
+    ) -> list[NormalizedRecord]:
+        all_normalized: list[NormalizedRecord] = []
         for normalizer in self._normalizers:
             try:
-                events = normalizer.normalize(records)
-                all_events.extend(events)
-                logger.info("Normalizer '{}' produced {} events", normalizer.name, len(events))
+                normalized = normalizer.normalize(records)
+                all_normalized.extend(normalized)
+                logger.info("Normalizer '{}' produced {} records", normalizer.name, len(normalized))
             except NormalizeError as e:
                 msg = f"Normalizer '{normalizer.name}' failed: {e}"
                 logger.error(msg)
                 result.errors.append(msg)
-        result.normalized_count = len(all_events)
-        return all_events
+        result.normalized_count = len(all_normalized)
+        return all_normalized
 
-    def _store(self, events: list[EventCreate], result: PipelineResult) -> None:
-        for event in events:
+    def _store(self, normalized: list[NormalizedRecord], result: PipelineResult) -> None:
+        for nr in normalized:
             try:
+                if self._player_resolver is not None:
+                    event = normalized_to_event_create(nr, self._player_resolver)
+                else:
+                    event = self._create_dummy_event(nr)
                 self._repository.add_event(event)
                 result.stored_count += 1
+            except UnresolvedPlayerError as e:
+                msg = f"Unresolved player: {e}"
+                logger.error(msg)
+                result.errors.append(str(e))
             except Exception as e:
                 msg = f"Failed to store event: {e}"
                 logger.error(msg)
                 result.errors.append(msg)
+
+    @staticmethod
+    def _create_dummy_event(nr: NormalizedRecord) -> EventCreate:
+        return EventCreate(
+            player_id=0,
+            event_type=nr.event_type,
+            description=nr.title,
+            source_name=nr.source_name,
+            source_url=nr.source_url,
+            confidence=nr.confidence,
+            event_date=nr.effective_date or nr.published_at,
+            start_date=nr.effective_date,
+        )
