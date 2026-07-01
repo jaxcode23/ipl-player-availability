@@ -20,6 +20,18 @@ from .utils import clean_html
 _PLAYER_RE = re.compile(r"(?:[A-Z]{1,2}\.?\s+)?[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}")
 
 
+def _extend_to_word_boundary(text: str, pos: int, side: str = "right") -> int:
+    if pos <= 0 or pos >= len(text):
+        return pos
+    if side == "right":
+        while pos < len(text) and text[pos].isalpha():
+            pos += 1
+    else:
+        while pos > 0 and text[pos - 1].isalpha():
+            pos -= 1
+    return pos
+
+
 def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
     body = clean_html(raw_data.content)
     combined = f"{raw_data.title} {body}".strip()
@@ -36,8 +48,10 @@ def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
     records: list[ParsedRecord] = []
 
     for event_type, kw_start, kw_end in matches:
-        window_start = max(0, kw_start - 60)
-        window_end = min(len(combined), kw_end + 60)
+        window_start = max(0, kw_start - 120)
+        window_end = min(len(combined), kw_end + 120)
+        window_start = _extend_to_word_boundary(combined, window_start, side="left")
+        window_end = _extend_to_word_boundary(combined, window_end, side="right")
         context = combined[window_start:window_end]
 
         player: str | None = None
@@ -225,17 +239,51 @@ def _is_obviously_not_player(name: str) -> bool:
         "news",
         "update",
         "report",
+        "ma chidambaram stadium",
+        "m chidambaram stadium",
+        "wankhede stadium",
+        "chinnaswamy stadium",
+        "eden gardens",
+        "arun jaitley stadium",
+        "narendra modi stadium",
+        "rajiv gandhi stadium",
+        "sawai mansingh stadium",
+        "pca stadium",
+        "holkar stadium",
     }
-    return lower in non_player_phrases or name.isupper()
+    if lower in non_player_phrases or name.isupper():
+        return True
+    for team_variants in TEAM_NAMES.values():
+        for variant in team_variants:
+            if _word_in_text(variant, lower) and lower == variant:
+                return True
+    for canonical in TEAM_NAMES:
+        if lower == canonical.lower():
+            return True
+    return False
 
 
 def extract_team_name(text: str) -> str | None:
     text_lower = text.lower()
     for canonical, variants in TEAM_NAMES.items():
         for variant in variants:
-            if variant in text_lower:
+            if _word_in_text(variant, text_lower):
                 return canonical
     return None
+
+
+def _word_in_text(word: str, text_lower: str) -> bool:
+    if len(word) <= 3:
+        idx = text_lower.find(word)
+        while idx != -1:
+            before = idx == 0 or not text_lower[idx - 1].isalpha()
+            after_pos = idx + len(word)
+            after = after_pos >= len(text_lower) or not text_lower[after_pos].isalpha()
+            if before and after:
+                return True
+            idx = text_lower.find(word, idx + 1)
+        return False
+    return word in text_lower
 
 
 def extract_injury_type(text: str) -> str | None:
@@ -294,11 +342,11 @@ def _extract_replacement_signed_name(text: str) -> str | None:
 
 
 def _find_nearest_name(fragment: str) -> str | None:
-    matches = list(_PLAYER_RE.finditer(fragment))
-    if not matches:
+    candidates = [(m.group(), m.start()) for m in _PLAYER_RE.finditer(fragment) if not _is_obviously_not_player(m.group())]
+    if not candidates:
         return None
     center = len(fragment) // 2
-    return min(matches, key=lambda m: abs(m.start() - center)).group()
+    return min(candidates, key=lambda c: abs(c[1] - center))[0]
 
 
 def extract_effective_date(text: str, published_at: date) -> date | None:
