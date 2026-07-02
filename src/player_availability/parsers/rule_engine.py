@@ -8,17 +8,35 @@ from ..domain.enums import AvailabilityStatus, ConfidenceLevel, EventType
 from .base import ParsedRecord
 from .patterns import (
     COUNTRY_NAMES,
+    EVENT_FRAGMENTS,
     EVENT_KEYWORDS,
     EVENT_PRIORITY,
     GENERIC_NOUNS,
+    HEADLINE_BOILERPLATE,
+    HEADLINE_FRAGMENTS,
     HIGH_CONFIDENCE_PHRASES,
     INJURY_KEYWORDS,
     LOW_CONFIDENCE_PHRASES,
     MEDIUM_CONFIDENCE_PHRASES,
     PUBLISHER_NAMES,
+    REGION_NAMES,
     TEAM_NAMES,
 )
 from .utils import clean_html
+
+# Tokens stripped only during prefix/suffix cleanup (not in global validation)
+# to avoid false positives on words that can appear in legitimate contexts.
+_CLEANUP_TOKEN_SET: set[str] = {"bad"}
+
+# Build set of team word fragments for partial team name rejection.
+# Catches cases like "Kings" (from "super kings", "punjab kings") or
+# "Indians" (from "mumbai indians") that aren't caught by exact variant match.
+_TEAM_WORD_FRAGMENTS: set[str] = set()
+for _variants in TEAM_NAMES.values():
+    for _variant in _variants:
+        for _word in _variant.split():
+            if len(_word) > 3:
+                _TEAM_WORD_FRAGMENTS.add(_word.lower())
 
 _PLAYER_RE = re.compile(r"(?:[A-Z]{1,2}\.?\s+)?[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}")
 
@@ -56,6 +74,91 @@ def _extend_to_word_boundary(text: str, pos: int, side: str = "right") -> int:
         while pos > 0 and text[pos - 1].isalpha():
             pos -= 1
     return pos
+
+
+def _tokenize_phrase(phrase: str) -> list[str]:
+    return phrase.split()
+
+
+def _match_prefix(tokens: list[str], phrases: set[str]) -> int:
+    for phrase in phrases:
+        pts = _tokenize_phrase(phrase)
+        n = len(pts)
+        if n <= len(tokens) and all(t.lower() == pt for t, pt in zip(tokens[:n], pts)):
+            return n
+    return 0
+
+
+def _match_suffix(tokens: list[str], phrases: set[str]) -> int:
+    for phrase in phrases:
+        pts = _tokenize_phrase(phrase)
+        n = len(pts)
+        if n <= len(tokens) and all(t.lower() == pt for t, pt in zip(tokens[-n:], pts)):
+            return n
+    return 0
+
+
+def _clean_player_name(name: str) -> str | None:
+    if not name:
+        return None
+    tokens = name.split()
+    if not tokens:
+        return None
+
+    # Pre-compute single-token lookup sets
+    headline_lower: set[str] = HEADLINE_FRAGMENTS
+    country_lower: set[str] = COUNTRY_NAMES
+    region_lower: set[str] = REGION_NAMES
+    publisher_single: set[str] = {p for p in PUBLISHER_NAMES if " " not in p}
+    event_single: set[str] = {p for p in EVENT_FRAGMENTS if " " not in p}
+    publisher_multi: set[str] = {p for p in PUBLISHER_NAMES if " " in p}
+    region_multi: set[str] = {p for p in REGION_NAMES if " " in p}
+    boilerplate_multi: set[str] = {p for p in HEADLINE_BOILERPLATE if " " in p}
+    event_multi: set[str] = {p for p in EVENT_FRAGMENTS if " " in p}
+
+    _SINGLE_PREFIX: set[str] = (
+        headline_lower | country_lower | region_lower | publisher_single | event_single | _CLEANUP_TOKEN_SET
+    )
+    _SINGLE_SUFFIX: set[str] = headline_lower | event_single | _CLEANUP_TOKEN_SET
+    _MULTI_PREFIX: set[str] = boilerplate_multi | event_multi | publisher_multi | region_multi
+    _MULTI_SUFFIX: set[str] = event_multi
+
+    changed = True
+    while changed:
+        changed = False
+
+        # --- Strip prefix ---
+        while tokens:
+            n = _match_prefix(tokens, _MULTI_PREFIX)
+            if n:
+                tokens = tokens[n:]
+                changed = True
+                continue
+            if tokens[0].lower() in _SINGLE_PREFIX:
+                tokens.pop(0)
+                changed = True
+                continue
+            break
+
+        if not tokens:
+            break
+
+        # --- Strip suffix ---
+        while tokens:
+            n = _match_suffix(tokens, _MULTI_SUFFIX)
+            if n:
+                tokens = tokens[:-n]
+                changed = True
+                continue
+            if tokens[-1].lower() in _SINGLE_SUFFIX:
+                tokens.pop(-1)
+                changed = True
+                continue
+            break
+
+    if not tokens:
+        return None
+    return " ".join(tokens)
 
 
 def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
@@ -97,6 +200,11 @@ def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
         if player is None:
             player = extract_player_name_from_title(raw_data.title, event_type)
         if player is None:
+            continue
+        # Clean the candidate name (strip noise prefixes/suffixes)
+        player = _clean_player_name(player)
+        if player is None:
+            logger.debug("Rejected player candidate (no valid name after cleanup)")
             continue
         if not _is_valid_player_candidate(player):
             continue
@@ -191,7 +299,17 @@ def detect_event_type(text: str) -> EventType | None:
 
 
 def extract_player_name(text: str) -> str | None:
-    candidates = _find_name_candidates(text)
+    raw_candidates = _find_name_candidates(text)
+    if not raw_candidates:
+        return None
+
+    # Clean candidates (strip noise prefixes/suffixes)
+    candidates: list[tuple[str, int]] = []
+    for name, pos in raw_candidates:
+        cleaned = _clean_player_name(name)
+        if cleaned is not None:
+            candidates.append((cleaned, pos))
+
     if not candidates:
         return None
 
@@ -297,15 +415,51 @@ _CRICKET_CONTEXT_TERMS: set[str] = {
 }
 
 
+def _is_team_name_exact(lower: str) -> bool:
+    for canonical, variants in TEAM_NAMES.items():
+        if lower == canonical.lower():
+            return True
+        for variant in variants:
+            if lower == variant:
+                return True
+    # Reject single-word candidates that match a ≥4-char word
+    # within any team variant (catches "kings", "indians", "titans", etc.)
+    if lower in _TEAM_WORD_FRAGMENTS:
+        return True
+    return False
+
+
 def _is_valid_player_candidate(name: str) -> bool:
     if len(name.strip()) < 2 or len(name) > 40:
+        logger.debug("Rejected player candidate '{}' (invalid length)", name)
         return False
     if name.isupper():
+        logger.debug("Rejected player candidate '{}' (all uppercase)", name)
         return False
     if not _has_capitalized_word(name):
+        logger.debug("Rejected player candidate '{}' (no capitalized word)", name)
         return False
     lower = name.lower()
-    if lower in PUBLISHER_NAMES or lower in GENERIC_NOUNS or lower in COUNTRY_NAMES:
+    if lower in PUBLISHER_NAMES:
+        logger.debug("Rejected player candidate '{}' (publisher name)", name)
+        return False
+    if lower in GENERIC_NOUNS:
+        logger.debug("Rejected player candidate '{}' (generic noun)", name)
+        return False
+    if lower in COUNTRY_NAMES:
+        logger.debug("Rejected player candidate '{}' (country name)", name)
+        return False
+    if lower in HEADLINE_FRAGMENTS:
+        logger.debug("Rejected player candidate '{}' (headline fragment)", name)
+        return False
+    if lower in REGION_NAMES:
+        logger.debug("Rejected player candidate '{}' (region name)", name)
+        return False
+    if lower in HEADLINE_BOILERPLATE:
+        logger.debug("Rejected player candidate '{}' (headline boilerplate)", name)
+        return False
+    if _is_team_name_exact(lower):
+        logger.debug("Rejected player candidate '{}' (team name)", name)
         return False
     return True
 
@@ -438,7 +592,7 @@ def _extract_replacement_signed_name(text: str) -> str | None:
 
     before = text[:idx]
 
-    for_pat = re.search(r"(?:signs|names|named|brings|drafts|ropes|calls)\s+", before, re.IGNORECASE)
+    for_pat = re.search(r"(?:signs?|names|named|brings?|drafts?|ropes?|calls?)\s+", before, re.IGNORECASE)
     if for_pat:
         before_verb = before[: for_pat.start()]
         candidates = list(_PLAYER_RE.finditer(before_verb))
@@ -457,9 +611,15 @@ def _extract_replacement_signed_name(text: str) -> str | None:
 
 
 def _find_nearest_name(fragment: str) -> str | None:
-    candidates = [
-        (m.group(), m.start()) for m in _PLAYER_RE.finditer(fragment) if not _is_obviously_not_player(m.group())
-    ]
+    candidates: list[tuple[str, int]] = []
+    for m in _PLAYER_RE.finditer(fragment):
+        name = m.group()
+        cleaned = _clean_player_name(name)
+        if cleaned is None:
+            continue
+        if _is_obviously_not_player(cleaned):
+            continue
+        candidates.append((cleaned, m.start()))
     if not candidates:
         return None
     center = len(fragment) // 2

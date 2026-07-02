@@ -6,7 +6,10 @@ from player_availability.domain.enums import (
     EventType,
 )
 from player_availability.parsers.rule_engine import (
+    _clean_player_name,
     _find_all_keyword_matches,
+    _is_team_name_exact,
+    _is_valid_player_candidate,
     detect_event_type,
     determine_confidence,
     extract_effective_date,
@@ -295,6 +298,20 @@ class TestReplacementExtraction:
         assert incoming is None
         assert outgoing is None
 
+    def test_sign_without_s_detected_by_signed_name(self) -> None:
+        from player_availability.parsers.rule_engine import _extract_replacement_signed_name
+
+        text = "SK sign Akash Madhwal as replacement for"
+        result = _extract_replacement_signed_name(text)
+        assert result == "Akash Madhwal"
+
+    def test_ropes_verb_detected_by_signed_name(self) -> None:
+        from player_availability.parsers.rule_engine import _extract_replacement_signed_name
+
+        text = "MI rope in Nuwan Thushara as replacement for"
+        result = _extract_replacement_signed_name(text)
+        assert result == "Nuwan Thushara"
+
 
 class TestNewKeywords:
     def test_withdraws_detected(self) -> None:
@@ -362,3 +379,304 @@ class TestNewKeywords:
 
     def test_sanction_detected(self) -> None:
         assert detect_event_type("handed a sanction") == EventType.SUSPENSION
+
+
+class TestTeamNameExact:
+    def test_full_team_name(self) -> None:
+        assert _is_team_name_exact("chennai super kings") is True
+
+    def test_team_abbreviation(self) -> None:
+        assert _is_team_name_exact("csk") is True
+
+    def test_partial_variant(self) -> None:
+        assert _is_team_name_exact("chennai") is True
+
+    def test_not_a_team(self) -> None:
+        assert _is_team_name_exact("virat kohli") is False
+
+    def test_empty_string(self) -> None:
+        assert _is_team_name_exact("") is False
+
+    def test_team_word_fragment_kings(self) -> None:
+        assert _is_team_name_exact("kings") is True
+
+    def test_team_word_fragment_indians(self) -> None:
+        assert _is_team_name_exact("indians") is True
+
+    def test_team_word_fragment_titans(self) -> None:
+        assert _is_team_name_exact("titans") is True
+
+    def test_team_word_fragment_royals(self) -> None:
+        assert _is_team_name_exact("royals") is True
+
+    def test_non_team_word_not_rejected(self) -> None:
+        assert _is_team_name_exact("dhoni") is False
+        assert _is_team_name_exact("kohli") is False
+
+
+class TestIsValidPlayerCandidate:
+    def test_valid_name(self) -> None:
+        assert _is_valid_player_candidate("Virat Kohli") is True
+
+    def test_valid_initial_name(self) -> None:
+        assert _is_valid_player_candidate("MS Dhoni") is True
+
+    def test_too_short(self) -> None:
+        assert _is_valid_player_candidate("A") is False
+
+    def test_publisher_name(self) -> None:
+        assert _is_valid_player_candidate("Cricinfo") is False
+
+    def test_generic_noun(self) -> None:
+        assert _is_valid_player_candidate("Latest") is False
+
+    def test_excellence_rejected(self) -> None:
+        assert _is_valid_player_candidate("Excellence") is False
+
+    def test_country_name(self) -> None:
+        assert _is_valid_player_candidate("India") is False
+
+    def test_headline_fragment_the(self) -> None:
+        assert _is_valid_player_candidate("The") is False
+
+    def test_headline_fragment_his(self) -> None:
+        assert _is_valid_player_candidate("His") is False
+
+    def test_headline_fragment_as(self) -> None:
+        assert _is_valid_player_candidate("As") is False
+
+    def test_region_name_karnataka(self) -> None:
+        assert _is_valid_player_candidate("Karnataka") is False
+
+    def test_region_name_south_african(self) -> None:
+        assert _is_valid_player_candidate("South African") is False
+
+    def test_headline_boilerplate(self) -> None:
+        assert _is_valid_player_candidate("Injured Players List") is False
+
+    def test_team_name_rejected(self) -> None:
+        assert _is_valid_player_candidate("Chennai Super Kings") is False
+
+    def test_team_abbreviation_rejected(self) -> None:
+        assert _is_valid_player_candidate("CSK") is False
+
+    def test_team_variant_rejected(self) -> None:
+        assert _is_valid_player_candidate("Super Kings") is False
+
+    def test_captain_rejected(self) -> None:
+        assert _is_valid_player_candidate("Captain") is False
+
+    def test_player_rejected(self) -> None:
+        assert _is_valid_player_candidate("Player") is False
+
+    def test_league_rejected(self) -> None:
+        assert _is_valid_player_candidate("League") is False
+
+    def test_centre_rejected(self) -> None:
+        assert _is_valid_player_candidate("Centre") is False
+
+    def test_april_rejected(self) -> None:
+        assert _is_valid_player_candidate("April") is False
+
+    def test_deepens_rejected(self) -> None:
+        assert _is_valid_player_candidate("Deepens") is False
+
+    def test_he_rejected(self) -> None:
+        assert _is_valid_player_candidate("He") is False
+
+    def test_still_rejected(self) -> None:
+        assert _is_valid_player_candidate("Still") is False
+
+    def test_played_rejected(self) -> None:
+        assert _is_valid_player_candidate("Played") is False
+
+    def test_month_name_january_rejected(self) -> None:
+        assert _is_valid_player_candidate("January") is False
+
+    def test_kings_team_word_rejected(self) -> None:
+        assert _is_valid_player_candidate("Kings") is False
+
+    def test_indians_team_word_rejected(self) -> None:
+        assert _is_valid_player_candidate("Indians") is False
+
+
+class TestCleanPlayerName:
+    def test_none_input(self) -> None:
+        assert _clean_player_name("") is None
+
+    def test_valid_name_unchanged(self) -> None:
+        assert _clean_player_name("Virat Kohli") == "Virat Kohli"
+
+    def test_initial_name_unchanged(self) -> None:
+        assert _clean_player_name("MS Dhoni") == "MS Dhoni"
+
+    def test_single_word_valid_name_unchanged(self) -> None:
+        assert _clean_player_name("Kohli") == "Kohli"
+
+    def test_strips_headline_fragment_prefix(self) -> None:
+        assert _clean_player_name("The Virat Kohli") == "Virat Kohli"
+
+    def test_strips_headline_fragment_suffix(self) -> None:
+        assert _clean_player_name("Forrester As") == "Forrester"
+
+    def test_strips_country_prefix(self) -> None:
+        assert _clean_player_name("India Ayush Mhatre") == "Ayush Mhatre"
+
+    def test_strips_publisher_prefix(self) -> None:
+        assert _clean_player_name("Cricket Country Bad") is None
+
+    def test_strips_event_fragment_prefix(self) -> None:
+        result = _clean_player_name("SK Sign Akash Madhwal")
+        assert result == "Akash Madhwal"
+
+    def test_strips_event_fragment_suffix(self) -> None:
+        assert _clean_player_name("RS Ambrish As Injury") == "RS Ambrish"
+
+    def test_strips_rope_in_prefix(self) -> None:
+        assert _clean_player_name("Rope In Dian") == "Dian"
+
+    def test_strips_boilerplate_prefix(self) -> None:
+        assert _clean_player_name("A Former Rajasthan Royals") is None
+
+    def test_strips_meet_prefix(self) -> None:
+        assert _clean_player_name("Meet Macneil Hadley") == "Macneil Hadley"
+
+    def test_strips_multi_region_prefix(self) -> None:
+        assert _clean_player_name("South African Cricketer") == "Cricketer"
+
+    def test_strips_multi_country_prefix(self) -> None:
+        assert _clean_player_name("India Big") is None
+
+    def test_strips_multi_noise(self) -> None:
+        assert _clean_player_name("In Pakistan Super") is None
+
+    def test_strips_tv_sports_publisher(self) -> None:
+        assert _clean_player_name("TV Sports Chennai Super") is None
+
+    def test_strips_still_suffix(self) -> None:
+        assert _clean_player_name("Dhoni Still") == "Dhoni"
+
+    def test_strips_he_and_played(self) -> None:
+        assert _clean_player_name("He Last Played") is None
+
+    def test_strips_month_prefix(self) -> None:
+        assert _clean_player_name("April Dhoni") == "Dhoni"
+
+    def test_strips_month_suffix(self) -> None:
+        assert _clean_player_name("Dhoni April") == "Dhoni"
+
+    def test_full_pipeline_contaminated_names(self) -> None:
+        cases: list[tuple[str, str | None]] = [
+            # (input, expected_output or None if fully rejected)
+            # "Excellence" passes through cleanup; caught by _is_valid_player_candidate later
+            ("Excellence", "Excellence"),
+            ("The", None),
+            ("His", None),
+            ("Karnataka", None),
+            ("South African", None),
+            ("India Big", None),
+            ("In Pakistan Super", None),
+            ("TV Sports Chennai Super", None),
+            ("Cricket Country Bad", None),
+            ("SK Sign Akash Madhwal", "Akash Madhwal"),
+            ("RS Ambrish As Injury", "RS Ambrish"),
+            ("Forrester As", "Forrester"),
+            ("Rope In Dian", "Dian"),
+            ("Meet Macneil Hadley", "Macneil Hadley"),
+            ("A Former Rajasthan Royals", None),
+            ("Injured Players List", None),
+            ("India Ayush Mhatre", "Ayush Mhatre"),
+        ]
+        for input_name, expected in cases:
+            result = _clean_player_name(input_name)
+            assert result == expected, f"_clean_player_name({input_name!r}) = {result!r}, expected {expected!r}"
+
+
+class TestInvalidPlayerNameRejection:
+    def test_excellence_rejected(self) -> None:
+        assert extract_player_name("Excellence") is None
+
+    def test_the_rejected(self) -> None:
+        assert extract_player_name("The") is None
+
+    def test_his_rejected(self) -> None:
+        assert extract_player_name("His") is None
+
+    def test_karnataka_rejected(self) -> None:
+        assert extract_player_name("Karnataka") is None
+
+    def test_south_african_rejected(self) -> None:
+        assert extract_player_name("South African") is None
+
+    def test_injured_players_list_rejected(self) -> None:
+        assert extract_player_name("Injured Players List") is None
+
+    def test_csk_team_name_rejected(self) -> None:
+        assert extract_player_name("CSK") is None
+
+    def test_clean_contaminated_name_finds_player(self) -> None:
+        text = "India Ayush Mhatre ruled out of IPL"
+        result = extract_player_name(text)
+        assert result is not None
+        assert "Ayush" in result
+
+    def test_sk_sign_cleaned(self) -> None:
+        text = "SK Sign Akash Madhwal named as replacement"
+        result = extract_player_name(text)
+        assert result is not None
+        assert result == "Akash Madhwal"
+
+    def test_meet_cleaned(self) -> None:
+        text = "Meet Macneil Hadley signs for CSK"
+        result = extract_player_name(text)
+        assert result is not None
+        assert result == "Macneil Hadley"
+
+    def test_a_former_team_rejected(self) -> None:
+        text = "A Former Rajasthan Royals replacement"
+        assert extract_player_name(text) is None
+
+    def test_in_pakistan_super_rejected(self) -> None:
+        text = "In Pakistan Super injury replacement"
+        assert extract_player_name(text) is None
+
+    def test_forrester_as_cleaned(self) -> None:
+        text = "Forrester As replacement for"
+        result = extract_player_name(text)
+        assert result is not None
+        assert "Forrester" in result
+
+    def test_country_prefix_cleaned(self) -> None:
+        text = "India Ayush Mhatre injury"
+        result = extract_player_name(text)
+        assert result is not None
+        assert result == "Ayush Mhatre"
+
+    def test_dhoni_still_cleaned_to_dhoni(self) -> None:
+        result = extract_player_name("Dhoni Still")
+        assert result is not None
+        assert result == "Dhoni"
+
+    def test_he_last_played_rejected(self) -> None:
+        assert extract_player_name("He Last Played") is None
+
+    def test_captain_rejected(self) -> None:
+        assert extract_player_name("Captain") is None
+
+    def test_league_rejected(self) -> None:
+        assert extract_player_name("League") is None
+
+    def test_centre_rejected(self) -> None:
+        assert extract_player_name("Centre") is None
+
+    def test_april_rejected(self) -> None:
+        assert extract_player_name("April") is None
+
+    def test_deepens_rejected(self) -> None:
+        assert extract_player_name("Deepens") is None
+
+    def test_kings_rejected_by_team_word(self) -> None:
+        assert extract_player_name("Kings") is None
+
+    def test_indians_rejected_by_team_word(self) -> None:
+        assert extract_player_name("Indians") is None
