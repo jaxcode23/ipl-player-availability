@@ -23,7 +23,7 @@ _RSS_XML = """<?xml version="1.0" encoding="UTF-8"?>
 </rss>"""
 
 
-@patch("player_availability.collectors.ipl_official.fetch_with_retry", return_value=_RSS_XML)
+@patch("player_availability.collectors.generic_rss.fetch_with_retry", return_value=_RSS_XML)
 def test_collect_returns_raw_data_objects(mock_fetch) -> None:
     collector = IPLOfficialCollector(max_retries=1, timeout=5.0)
     results = collector.collect()
@@ -37,7 +37,7 @@ def test_collect_returns_raw_data_objects(mock_fetch) -> None:
         assert item.content
 
 
-@patch("player_availability.collectors.ipl_official.fetch_with_retry", return_value=_RSS_XML)
+@patch("player_availability.collectors.generic_rss.fetch_with_retry", return_value=_RSS_XML)
 def test_collect_parses_all_items(mock_fetch) -> None:
     collector = IPLOfficialCollector(max_retries=1, timeout=5.0)
     results = collector.collect()
@@ -50,7 +50,7 @@ def test_collect_parses_all_items(mock_fetch) -> None:
     assert results[1].title == "Team Announces Replacement"
 
 
-@patch("player_availability.collectors.ipl_official.fetch_with_retry", return_value=_RSS_XML)
+@patch("player_availability.collectors.generic_rss.fetch_with_retry", return_value=_RSS_XML)
 def test_all_items_have_required_fields(mock_fetch) -> None:
     collector = IPLOfficialCollector(max_retries=1, timeout=5.0)
     results = collector.collect()

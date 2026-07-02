@@ -5,8 +5,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class SourceEntry(BaseModel):
     name: str
     base_url: str
-    type: str
+    type: str = "rss"
     is_active: bool = True
+    mechanism: str = "rss"
+    fetch_full_article: bool = False
 
 
 class Settings(BaseSettings):
@@ -23,8 +25,18 @@ class Settings(BaseSettings):
 
 def _default_sources() -> list[SourceEntry]:
     return [
-        SourceEntry(name="ipl_official", base_url="https://www.iplt20.com/rss/news", type="rss"),
-        SourceEntry(name="espn_cricinfo", base_url="https://www.espncricinfo.com/rss/content/story/feeds", type="rss"),
+        SourceEntry(
+            name="rediff_cricket",
+            base_url="https://cricket.rediff.com/rss/cricketrss.xml",
+            type="rss",
+            mechanism="rss",
+        ),
+        SourceEntry(
+            name="google_cricket_news",
+            base_url="https://news.google.com/rss/search?q=IPL+2026+player+injury+replacement+ruled+out&hl=en-IN&gl=IN&ceid=IN:en",
+            type="rss",
+            mechanism="rss",
+        ),
     ]
 
 

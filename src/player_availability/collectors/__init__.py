@@ -1,6 +1,7 @@
 from .base import BaseCollector, RawData
 from .espn_cricinfo import ESPNCricinfoRSSCollector
 from .exceptions import CollectError, SourceUnavailableError
+from .generic_rss import GenericRSSCollector
 from .http_client import fetch_with_retry
 from .ipl_official import IPLOfficialCollector
 from .mock import MockCollector
@@ -11,6 +12,7 @@ __all__ = [
     "CollectError",
     "ESPNCricinfoRSSCollector",
     "fetch_with_retry",
+    "GenericRSSCollector",
     "IPLOfficialCollector",
     "MockCollector",
     "parse_rss_date",

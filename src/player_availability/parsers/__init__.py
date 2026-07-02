@@ -1,3 +1,4 @@
+from .article_parser import GenericArticleParser
 from .base import BaseParser, ParsedRecord
 from .espn_cricinfo import ESPNCricinfoParser
 from .exceptions import ParseError
@@ -10,6 +11,7 @@ __all__ = [
     "BaseParser",
     "clean_html",
     "ESPNCricinfoParser",
+    "GenericArticleParser",
     "IPLOfficialParser",
     "MockParser",
     "parse_article",

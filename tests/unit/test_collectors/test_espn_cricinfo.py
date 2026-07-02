@@ -18,7 +18,7 @@ _RSS_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 @patch(
-    "player_availability.collectors.espn_cricinfo.fetch_with_retry",
+    "player_availability.collectors.generic_rss.fetch_with_retry",
     return_value=_RSS_XML,
 )
 def test_collect_returns_raw_data_objects(mock_fetch) -> None:
@@ -36,7 +36,7 @@ def test_collect_returns_raw_data_objects(mock_fetch) -> None:
 
 
 @patch(
-    "player_availability.collectors.espn_cricinfo.fetch_with_retry",
+    "player_availability.collectors.generic_rss.fetch_with_retry",
     return_value=_RSS_XML,
 )
 def test_source_name_consistent(mock_fetch) -> None:
