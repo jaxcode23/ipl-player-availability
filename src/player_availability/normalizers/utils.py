@@ -1,6 +1,9 @@
 import re
 from dataclasses import fields
 
+from player_availability.domain.enums import ConfidenceLevel
+from player_availability.parsers.patterns import COUNTRY_NAMES, GENERIC_NOUNS, PUBLISHER_NAMES
+
 from .exceptions import ValidationError
 from .models import NormalizedRecord
 
@@ -82,6 +85,14 @@ def validate_record(record: NormalizedRecord) -> None:
     if not record.source_name:
         errors.append("source_name is empty")
 
+    player_lower = record.player_name.lower().strip() if record.player_name else ""
+    if player_lower in PUBLISHER_NAMES:
+        errors.append(f"player_name '{record.player_name}' matches a publisher name")
+    if player_lower in GENERIC_NOUNS:
+        errors.append(f"player_name '{record.player_name}' matches a generic noun")
+    if player_lower in COUNTRY_NAMES:
+        errors.append(f"player_name '{record.player_name}' matches a country name")
+
     if record.published_at is None:
         errors.append("published_at is None")
 
@@ -91,6 +102,9 @@ def validate_record(record: NormalizedRecord) -> None:
         and record.replaced_player_name.lower().strip() == record.player_name.lower().strip()
     ):
         errors.append("replaced_player_name cannot be the same as player_name")
+
+    if errors and record.confidence == ConfidenceLevel.LOW:
+        errors.append("confidence is LOW, combined with other issues")
 
     if (
         record.replacement_player_name

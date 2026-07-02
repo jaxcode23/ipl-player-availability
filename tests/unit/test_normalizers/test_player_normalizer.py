@@ -86,3 +86,11 @@ class TestPlayerNameNormalizer:
         normalizer = PlayerNameNormalizer(alias_registry=registry)
         assert normalizer.normalize("Custom") == "Custom Player"
         assert normalizer.normalize("Virat Kohli") == "Virat Kohli"
+
+    def test_deterministic_noise_stripped(self) -> None:
+        normalizer = PlayerNameNormalizer()
+        assert normalizer.normalize("Cricinfo Virat Kohli") == "Virat Kohli"
+        assert normalizer.normalize("India Today MS Dhoni (c)") == "MS Dhoni"
+        assert normalizer.normalize("Rohit Sharma returns") == "Rohit Sharma"
+        assert normalizer.normalize("Injury Crisis Deepens: Suryakumar Yadav") == "Suryakumar Yadav"
+        assert normalizer.normalize("Hardik Pandya still unavailable") == "Hardik Pandya"

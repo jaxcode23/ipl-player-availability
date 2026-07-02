@@ -153,6 +153,32 @@ class TestValidateRecord:
         assert "player_name is empty" in str(exc.value)
         assert "event_type is None" in str(exc.value)
 
+    def test_publisher_name_rejected(self) -> None:
+        record = self._make_record(player_name="Cricbuzz")
+        with pytest.raises(ValidationError, match="matches a publisher name"):
+            validate_record(record)
+
+    def test_generic_noun_rejected(self) -> None:
+        record = self._make_record(player_name="Highlights")
+        with pytest.raises(ValidationError, match="matches a generic noun"):
+            validate_record(record)
+
+    def test_country_name_rejected(self) -> None:
+        record = self._make_record(player_name="India")
+        with pytest.raises(ValidationError, match="matches a country name"):
+            validate_record(record)
+
+    def test_low_confidence_alone_does_not_raise(self) -> None:
+        record = self._make_record(confidence=ConfidenceLevel.LOW)
+        validate_record(record)
+
+    def test_low_confidence_with_other_errors_appended(self) -> None:
+        record = self._make_record(confidence=ConfidenceLevel.LOW, player_name="")
+        with pytest.raises(ValidationError) as exc:
+            validate_record(record)
+        assert "confidence is LOW" in str(exc.value)
+        assert "player_name is empty" in str(exc.value)
+
 
 class TestCountNonNoneFields:
     def test_all_fields_set(self) -> None:

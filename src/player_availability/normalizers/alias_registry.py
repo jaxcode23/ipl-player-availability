@@ -14,13 +14,39 @@ class AliasRegistry:
 
     def register(self, canonical: str, *aliases: str) -> None:
         canonical_key = canonical.lower().strip()
+
+        # Check canonical itself
+        if (
+            canonical_key in self._alias_to_canonical
+            and self._alias_to_canonical[canonical_key] != canonical
+        ):
+            existing = self._alias_to_canonical[canonical_key]
+            raise ValueError(
+                f"Alias collision: '{canonical_key}' "
+                f"is already registered to '{existing}'"
+            )
+
         self._alias_to_canonical[canonical_key] = canonical
         self._canonical_lower.add(canonical_key)
+
         for alias in aliases:
-            self._alias_to_canonical[alias.lower().strip()] = canonical
+            alias_key = alias.lower().strip()
+
+            if (
+                alias_key in self._alias_to_canonical
+                and self._alias_to_canonical[alias_key] != canonical
+            ):
+                existing = self._alias_to_canonical[alias_key]
+                raise ValueError(
+                    f"Alias collision: '{alias_key}' "
+                    f"is already registered to '{existing}'"
+                )
+
+            self._alias_to_canonical[alias_key] = canonical
 
     def resolve(self, name: str) -> str | None:
         return self._alias_to_canonical.get(name.lower().strip())
 
     def known_canonical(self, name: str) -> bool:
         return name.lower().strip() in self._canonical_lower
+

@@ -34,11 +34,13 @@ class TestAliasRegistry:
         assert registry.known_canonical("MS Dhoni") is True
         assert registry.known_canonical("Dhoni") is False
 
-    def test_overwrite_alias(self) -> None:
+    def test_collision_raises_value_error(self) -> None:
+        import pytest
+
         registry = AliasRegistry()
         registry.register("Virat Kohli", "Kohli")
-        registry.register("Yuzvendra Chahal", "Kohli")
-        assert registry.resolve("Kohli") == "Yuzvendra Chahal"
+        with pytest.raises(ValueError, match="Alias collision"):
+            registry.register("Yuzvendra Chahal", "Kohli")
 
     def test_whitespace_handling(self) -> None:
         registry = AliasRegistry()
