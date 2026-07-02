@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -6,15 +6,15 @@ from sqlalchemy.orm import sessionmaker
 
 from player_availability.collectors import MockCollector, SourceUnavailableError
 from player_availability.collectors.base import RawData
-from player_availability.parsers.exceptions import ParseError
-from player_availability.normalizers.exceptions import NormalizeError
 from player_availability.db.base import Base
 from player_availability.db.models import PlayerModel, TeamModel
 from player_availability.db.repository import SqlRepository
 from player_availability.db.resolver import DbPlayerResolver
-from player_availability.domain.enums import ConfidenceLevel, EventType
+from player_availability.domain.enums import EventType
 from player_availability.normalizers import DefaultNormalizer
+from player_availability.normalizers.exceptions import NormalizeError
 from player_availability.parsers import ESPNCricinfoParser, IPLOfficialParser, MockParser
+from player_availability.parsers.exceptions import ParseError
 from player_availability.pipeline.availability_pipeline import AvailabilityPipeline
 
 
@@ -34,13 +34,15 @@ def seeded_session():
         session.add(t)
     session.flush()
 
-    session.add_all([
-        PlayerModel(name="MS Dhoni", team_id=teams["CSK"].id, role="wicket_keeper"),
-        PlayerModel(name="Virat Kohli", team_id=teams["RCB"].id, role="batter"),
-        PlayerModel(name="Jasprit Bumrah", team_id=teams["MI"].id, role="bowler"),
-        PlayerModel(name="Rohit Sharma", team_id=teams["MI"].id, role="batter"),
-        PlayerModel(name="Hardik Pandya", team_id=teams["MI"].id, role="all_rounder"),
-    ])
+    session.add_all(
+        [
+            PlayerModel(name="MS Dhoni", team_id=teams["CSK"].id, role="wicket_keeper"),
+            PlayerModel(name="Virat Kohli", team_id=teams["RCB"].id, role="batter"),
+            PlayerModel(name="Jasprit Bumrah", team_id=teams["MI"].id, role="bowler"),
+            PlayerModel(name="Rohit Sharma", team_id=teams["MI"].id, role="batter"),
+            PlayerModel(name="Hardik Pandya", team_id=teams["MI"].id, role="all_rounder"),
+        ]
+    )
     session.flush()
 
     yield session

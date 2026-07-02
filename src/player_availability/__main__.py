@@ -61,63 +61,21 @@ def main() -> None:
 
 
 def _handle_init_db() -> None:
-    from .db.models import PlayerModel, TeamModel
+    from .db.seed import seed_database
 
     Base.metadata.create_all(engine)
     logger.info("Database tables created")
-
-    with get_session() as session:
-        existing = session.query(TeamModel).count()
-        if existing == 0:
-            teams = {
-                "CSK": "Chennai Super Kings",
-                "MI": "Mumbai Indians",
-                "RCB": "Royal Challengers Bengaluru",
-                "KKR": "Kolkata Knight Riders",
-                "SRH": "Sunrisers Hyderabad",
-                "RR": "Rajasthan Royals",
-                "DC": "Delhi Capitals",
-                "LSG": "Lucknow Super Giants",
-                "PBKS": "Punjab Kings",
-                "GT": "Gujarat Titans",
-            }
-            team_objs: dict[str, TeamModel] = {}
-            for code, name in teams.items():
-                tm = TeamModel(name=name, short_code=code)
-                session.add(tm)
-                session.flush()
-                team_objs[code] = tm
-            logger.info("Seeded {} teams", len(teams))
-
-            players = [
-                ("MS Dhoni", "CSK", "wicket_keeper"),
-                ("Virat Kohli", "RCB", "batter"),
-                ("Jasprit Bumrah", "MI", "bowler"),
-                ("Rohit Sharma", "MI", "batter"),
-                ("KL Rahul", "LSG", "wicket_keeper"),
-                ("Rishabh Pant", "DC", "wicket_keeper"),
-                ("Shubman Gill", "GT", "batter"),
-                ("Hardik Pandya", "MI", "all_rounder"),
-                ("Ravindra Jadeja", "CSK", "all_rounder"),
-                ("Suryakumar Yadav", "MI", "batter"),
-            ]
-            for name, code, role in players:
-                session.add(
-                    PlayerModel(name=name, team_id=team_objs[code].id, role=role)
-                )
-            session.flush()
-            logger.info("Seeded {} players", len(players))
-
-        logger.info("Database initialization complete")
+    seed_database()
+    logger.info("Database initialization complete")
 
 
 def _handle_run_pipeline(args: argparse.Namespace) -> None:
-    from .collectors import ESPNCricinfoRSSCollector, IPLOfficialCollector, MockCollector
+    from .collectors import MockCollector
     from .config import settings
     from .db.repository import SqlRepository
     from .db.resolver import DbPlayerResolver
     from .normalizers import DefaultNormalizer
-    from .parsers import ESPNCricinfoParser, IPLOfficialParser, MockParser
+    from .parsers import GenericArticleParser, MockParser
     from .pipeline.availability_pipeline import AvailabilityPipeline
 
     Base.metadata.create_all(engine)
@@ -129,25 +87,23 @@ def _handle_run_pipeline(args: argparse.Namespace) -> None:
         collectors.append(MockCollector())
     else:
         for source in settings.source_registry:
-            if source.type == "rss" and source.is_active:
-                name = source.name
+            if source.is_active:
                 try:
-                    if name == "ipl_official":
-                        collectors.append(IPLOfficialCollector(url=source.base_url))
-                        logger.info("Registered collector: {} -> {}", name, source.base_url)
-                    elif name == "espn_cricinfo":
-                        collectors.append(ESPNCricinfoRSSCollector(url=source.base_url))
-                        logger.info("Registered collector: {} -> {}", name, source.base_url)
-                    else:
-                        logger.warning("Unknown source type '{}', skipping", name)
+                    collector = _build_collector(source)
+                    if collector is not None:
+                        collectors.append(collector)
+                        logger.info("Registered collector: {} -> {}", source.name, source.base_url)
                 except Exception as e:
-                    logger.error("Failed to register collector '{}': {}", name, e)
+                    logger.error("Failed to register collector '{}': {}", source.name, e)
 
         if not collectors:
             logger.warning("No live collectors could be registered; falling back to mock")
             collectors.append(MockCollector())
 
-    parsers = [IPLOfficialParser(), ESPNCricinfoParser(), MockParser()]
+    parsers = [MockParser()]
+    for source in settings.source_registry:
+        if source.is_active:
+            parsers.append(GenericArticleParser(source_name=source.name))
     normalizers = [DefaultNormalizer()]
 
     with get_session() as session:
@@ -167,6 +123,20 @@ def _handle_run_pipeline(args: argparse.Namespace) -> None:
         _print_pipeline_result(result)
 
 
+def _build_collector(source) -> object | None:
+    from .collectors import GenericRSSCollector
+
+    mechanism = getattr(source, "mechanism", source.type)
+    if mechanism == "rss":
+        return GenericRSSCollector(
+            source_name=source.name,
+            url=source.base_url,
+            fetch_full_article=getattr(source, "fetch_full_article", False),
+        )
+    logger.warning("Unknown mechanism '{}' for source '{}', skipping", mechanism, source.name)
+    return None
+
+
 def _print_pipeline_result(result) -> None:
     separator = "-" * 60
     logger.info(separator)
@@ -176,6 +146,20 @@ def _print_pipeline_result(result) -> None:
     logger.info("  Records parsed         : {}", result.parsed_count)
     logger.info("  Records normalized     : {}", result.normalized_count)
     logger.info("  Events stored          : {}", result.stored_count)
+    logger.info("  Players resolved       : {}", result.resolved_count)
+    logger.info("  Players unresolved     : {}", result.unresolved_count)
+    if result.event_type_counts:
+        logger.info("  By event type:")
+        for et, cnt in sorted(result.event_type_counts.items()):
+            logger.info("    {:25s}: {}", et.replace("_", " ").title(), cnt)
+    if result.confidence_counts:
+        logger.info("  By confidence:")
+        for cl, cnt in sorted(result.confidence_counts.items()):
+            logger.info("    {:25s}: {}", cl.title(), cnt)
+    if result.team_counts:
+        logger.info("  By team:")
+        for team, cnt in sorted(result.team_counts.items()):
+            logger.info("    {:25s}: {}", team, cnt)
     if result.errors:
         logger.info("  Errors ({}):", len(result.errors))
         for i, err in enumerate(result.errors, 1):

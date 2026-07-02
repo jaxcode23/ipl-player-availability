@@ -23,6 +23,11 @@ class PipelineResult:
     normalized_count: int = 0
     stored_count: int = 0
     errors: list[str] = field(default_factory=list)
+    event_type_counts: dict[str, int] = field(default_factory=dict)
+    confidence_counts: dict[str, int] = field(default_factory=dict)
+    team_counts: dict[str, int] = field(default_factory=dict)
+    resolved_count: int = 0
+    unresolved_count: int = 0
 
 
 class AvailabilityPipeline:
@@ -99,6 +104,13 @@ class AvailabilityPipeline:
                 logger.error(msg)
                 result.errors.append(msg)
         result.normalized_count = len(all_normalized)
+        for nr in all_normalized:
+            et = nr.event_type.value if nr.event_type else "unknown"
+            result.event_type_counts[et] = result.event_type_counts.get(et, 0) + 1
+            cl = nr.confidence.name if nr.confidence else "unknown"
+            result.confidence_counts[cl] = result.confidence_counts.get(cl, 0) + 1
+            if nr.team_name:
+                result.team_counts[nr.team_name] = result.team_counts.get(nr.team_name, 0) + 1
         return all_normalized
 
     def _store(self, normalized: list[NormalizedRecord], result: PipelineResult) -> None:
@@ -106,13 +118,14 @@ class AvailabilityPipeline:
             try:
                 if self._player_resolver is not None:
                     event = normalized_to_event_create(nr, self._player_resolver)
+                    result.resolved_count += 1
                 else:
                     event = self._create_dummy_event(nr)
                 self._repository.add_event(event)
                 result.stored_count += 1
             except UnresolvedPlayerError as e:
-                msg = f"Unresolved player: {e}"
-                logger.error(msg)
+                result.unresolved_count += 1
+                logger.error("Unresolved player: {}", e)
                 result.errors.append(str(e))
             except Exception as e:
                 msg = f"Failed to store event: {e}"
