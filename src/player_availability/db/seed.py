@@ -46,6 +46,11 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Richard Gleeson", "CSK", "bowler", True),
     ("Imran Tahir", "CSK", "bowler", True),
     ("Ben Stokes", "CSK", "all_rounder", True),
+    ("Ayush Mhatre", "CSK", "batter", False),
+    ("Ramakrishna Ghosh", "CSK", "batter", False),
+    ("Dian Forrester", "CSK", "all_rounder", True),
+    ("Macneil Noronha", "CSK", "batter", False),
+    ("Kuldip Yadav", "CSK", "bowler", False),
     # Mumbai Indians
     ("Rohit Sharma", "MI", "batter", False),
     ("Hardik Pandya", "MI", "all_rounder", False),
@@ -64,13 +69,16 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Naman Dhir", "MI", "batter", False),
     ("Gerald Coetzee", "MI", "bowler", True),
     ("Jason Behrendorff", "MI", "bowler", True),
-    ("Nuwan Thusara", "MI", "bowler", True),
+    ("Nuwan Thushara", "MI", "bowler", True),
     ("Shreyas Gopal", "MI", "bowler", False),
     ("Suryansh Shedge", "MI", "all_rounder", False),
     ("Harvik Desai", "MI", "wicket_keeper", False),
     ("Kieron Pollard", "MI", "all_rounder", True),
     ("Jofra Archer", "MI", "bowler", True),
     ("Mohammad Nabi", "MI", "all_rounder", True),
+    ("Keshav Maharaj", "MI", "bowler", True),
+    ("Ruchit Ahir", "MI", "all_rounder", False),
+    ("Madushanka", "MI", "bowler", True),
     # Royal Challengers Bengaluru
     ("Virat Kohli", "RCB", "batter", False),
     ("Faf du Plessis", "RCB", "batter", True),
@@ -119,6 +127,9 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Mujeeb Ur Rahman", "KKR", "all_rounder", True),
     ("Gus Atkinson", "KKR", "bowler", True),
     ("Sakib Hussain", "KKR", "bowler", False),
+    ("Luvnith Sisodia", "KKR", "wicket_keeper", False),
+    ("Saurabh Dubey", "KKR", "bowler", False),
+    ("Rachin Ravindra", "KKR", "all_rounder", True),
     # Sunrisers Hyderabad
     ("Kane Williamson", "SRH", "batter", True),
     ("Jhye Richardson", "SRH", "bowler", True),
@@ -144,6 +155,9 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Upendra Yadav", "SRH", "wicket_keeper", False),
     ("Mayank Markande", "SRH", "bowler", False),
     ("Jaydev Unadkat", "SRH", "bowler", False),
+    ("Shivam Mavi", "SRH", "bowler", False),
+    ("David Payne", "SRH", "bowler", True),
+    ("RS Ambrish", "SRH", "all_rounder", False),
     # Rajasthan Royals
     ("Sanju Samson", "RR", "wicket_keeper", False),
     ("Jos Buttler", "RR", "wicket_keeper", True),
@@ -167,6 +181,8 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Nandre Burger", "RR", "bowler", True),
     ("Tom Kohler-Cadmore", "RR", "batter", True),
     ("Rovman Powell", "RR", "batter", True),
+    ("Dasun Shanaka", "RR", "all_rounder", True),
+    ("Emanjot Chahal", "RR", "bowler", False),
     # Delhi Capitals
     ("Rishabh Pant", "DC", "wicket_keeper", False),
     ("Prithvi Shaw", "DC", "batter", False),
@@ -261,6 +277,9 @@ PLAYER_SEED: list[tuple[str, str, str, bool]] = [
     ("Spencer Johnson", "GT", "bowler", True),
     ("Azmatullah Omarzai", "GT", "all_rounder", True),
     ("Robin Minz", "GT", "wicket_keeper", False),
+    ("Tom Banton", "GT", "wicket_keeper", True),
+    ("Connor Esterhuizen", "GT", "batter", True),
+    ("Jacob Bethell", "GT", "all_rounder", True),
 ]
 
 
