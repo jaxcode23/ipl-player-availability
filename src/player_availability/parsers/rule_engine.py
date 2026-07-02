@@ -7,17 +7,43 @@ from ..collectors.base import RawData
 from ..domain.enums import AvailabilityStatus, ConfidenceLevel, EventType
 from .base import ParsedRecord
 from .patterns import (
+    COUNTRY_NAMES,
     EVENT_KEYWORDS,
     EVENT_PRIORITY,
+    GENERIC_NOUNS,
     HIGH_CONFIDENCE_PHRASES,
     INJURY_KEYWORDS,
     LOW_CONFIDENCE_PHRASES,
     MEDIUM_CONFIDENCE_PHRASES,
+    PUBLISHER_NAMES,
     TEAM_NAMES,
 )
 from .utils import clean_html
 
 _PLAYER_RE = re.compile(r"(?:[A-Z]{1,2}\.?\s+)?[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}")
+
+# Reusable player name regex fragment (matches names like "MS Dhoni", "V Kohli", "Virat Kohli")
+_PLAYER_NAME = r"(?:[A-Z]{1,2}\.?\s+)?[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}"
+
+# Replacement extraction patterns: captures (incoming_player, outgoing_player)
+_REPLACEMENT_PAIR_PATTERNS: list[tuple[str, str, str]] = [
+    # "X replaces Y" or "X replaces Y as replacement"
+    (f"(?P<in>{_PLAYER_NAME})\\s+replaces\\s+(?P<out>{_PLAYER_NAME})(?:\\s+as|\\s+in|$|\\.|,|\\s)", "in", "out"),
+    # "[Team] signs/named [incoming] as replacement for [outgoing]"  (verb THEN incoming)
+    (
+        f"(?:[A-Z]{{2,}}\\s+)?(?:sign(?:s|ned)|nam(?:es|ed)|ropes?)\\s+(?P<in>{_PLAYER_NAME})\\s+as\\s+(?:a\\s+)?replacement\\s+for\\s+(?P<out>{_PLAYER_NAME})",
+        "in",
+        "out",
+    ),
+    # "[Team] brings/drafts/calls in [incoming] for [outgoing]"
+    (
+        f"(?:[A-Z]{{2,}}\\s+)?(?:brings?|brought|drafts?|drafted|calls?|called)\\s+in\\s+(?P<in>{_PLAYER_NAME})\\s+for\\s+(?P<out>{_PLAYER_NAME})",
+        "in",
+        "out",
+    ),
+    # "replacement for Y: X" or "replacement for Y — X" (separator is REQUIRED)
+    (f"replacement\\s+for\\s+(?P<out>{_PLAYER_NAME})\\s*[:–—]\\s*(?P<in>{_PLAYER_NAME})", "in", "out"),
+]
 
 
 def _extend_to_word_boundary(text: str, pos: int, side: str = "right") -> int:
@@ -55,9 +81,16 @@ def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
         context = combined[window_start:window_end]
 
         player: str | None = None
+        replacement: str | None = None
 
         if event_type == EventType.REPLACEMENT_SIGNED:
-            player = _extract_replacement_signed_name(combined)
+            pair = _extract_replacement_pair(combined)
+            if pair is not None:
+                player, replacement = pair
+            if player is None:
+                player = _extract_replacement_signed_name(combined)
+            if replacement is None:
+                replacement = extract_replacement(context) or extract_replacement(combined)
 
         if player is None:
             player = _find_nearest_name(context)
@@ -65,15 +98,22 @@ def parse_article(raw_data: RawData, source_name: str) -> list[ParsedRecord]:
             player = extract_player_name_from_title(raw_data.title, event_type)
         if player is None:
             continue
+        if not _is_valid_player_candidate(player):
+            continue
 
         key = (player.lower(), event_type)
         if key in seen:
             continue
         seen.add(key)
 
+        if replacement and player and replacement.lower() == player.lower():
+            replacement = None
         team_name = extract_team_name(context) or extract_team_name(combined)
         injury_type = extract_injury_type(context)
-        replacement = extract_replacement(context) or extract_replacement(combined)
+        if replacement is None:
+            replacement = extract_replacement(context) or extract_replacement(combined)
+        if replacement and player and replacement.lower() == player.lower():
+            replacement = None
         effective_date = extract_effective_date(context, published_at_date)
         confidence = determine_confidence(combined, event_type)
 
@@ -223,11 +263,64 @@ def extract_player_name_from_title(title: str, preferred_event: EventType | None
     return None
 
 
+_CRICKET_CONTEXT_TERMS: set[str] = {
+    "ipl",
+    "bowler",
+    "batsman",
+    "batter",
+    "all-rounder",
+    "wicket-keeper",
+    "captain",
+    "vice-captain",
+    "franchise",
+    "cricket",
+    "match",
+    "team",
+    "squad",
+    "playing xi",
+    "eleven",
+    "innings",
+    "over",
+    "run",
+    "wicket",
+    "stadium",
+    "ground",
+    "training",
+    "net session",
+    "practice",
+    "player",
+    "star",
+    "opener",
+    "spinner",
+    "fast bowler",
+    "paceman",
+}
+
+
+def _is_valid_player_candidate(name: str) -> bool:
+    if len(name.strip()) < 2 or len(name) > 40:
+        return False
+    if name.isupper():
+        return False
+    if not _has_capitalized_word(name):
+        return False
+    lower = name.lower()
+    if lower in PUBLISHER_NAMES or lower in GENERIC_NOUNS or lower in COUNTRY_NAMES:
+        return False
+    return True
+
+
+def _has_capitalized_word(name: str) -> bool:
+    return any(word and word[0].isupper() for word in name.split())
+
+
 def _find_name_candidates(text: str) -> list[tuple[str, int]]:
     return [(m.group(), m.start()) for m in _PLAYER_RE.finditer(text) if not _is_obviously_not_player(m.group())]
 
 
 def _is_obviously_not_player(name: str) -> bool:
+    if not _is_valid_player_candidate(name):
+        return True
     lower = name.lower()
     non_player_phrases: set[str] = {
         "indian premier league",
@@ -251,7 +344,7 @@ def _is_obviously_not_player(name: str) -> bool:
         "pca stadium",
         "holkar stadium",
     }
-    if lower in non_player_phrases or name.isupper():
+    if lower in non_player_phrases:
         return True
     for team_variants in TEAM_NAMES.values():
         for variant in team_variants:
@@ -308,12 +401,33 @@ def extract_replacement(text: str) -> str | None:
         matches = list(_PLAYER_RE.finditer(after_replacement))
         if matches:
             return matches[0].group()
+        return None
 
-    before = text[:idx]
-    matches = list(_PLAYER_RE.finditer(before))
-    if matches:
-        return matches[-1].group()
+    of_key = after.lower().find("of ")
+    if of_key != -1:
+        after_of = after[of_key + len("of ") :]
+        matches = list(_PLAYER_RE.finditer(after_of))
+        if matches:
+            return matches[0].group()
+        return None
+
     return None
+
+
+_all_player_patterns_compiled = [
+    (re.compile(pat), in_group, out_group) for pat, in_group, out_group in _REPLACEMENT_PAIR_PATTERNS
+]
+
+
+def _extract_replacement_pair(text: str) -> tuple[str | None, str | None]:
+    for compiled, in_group, out_group in _all_player_patterns_compiled:
+        m = compiled.search(text)
+        if m:
+            incoming = m.group(in_group)
+            outgoing = m.group(out_group)
+            if incoming and outgoing and incoming.lower() != outgoing.lower():
+                return incoming, outgoing
+    return None, None
 
 
 def _extract_replacement_signed_name(text: str) -> str | None:
@@ -324,29 +438,65 @@ def _extract_replacement_signed_name(text: str) -> str | None:
 
     before = text[:idx]
 
-    for_pat = re.search(r"(?:signs|names|named)\s+", before, re.IGNORECASE)
+    for_pat = re.search(r"(?:signs|names|named|brings|drafts|ropes|calls)\s+", before, re.IGNORECASE)
     if for_pat:
-        start = for_pat.end()
-        candidates = list(_PLAYER_RE.finditer(before, start))
+        before_verb = before[: for_pat.start()]
+        candidates = list(_PLAYER_RE.finditer(before_verb))
         if candidates:
-            return candidates[0].group()
-        after = text[idx + len("replacement") :]
-        after_candidates = list(_PLAYER_RE.finditer(after))
-        if after_candidates:
-            return after_candidates[0].group()
+            return candidates[-1].group()
 
-    candidates = list(_PLAYER_RE.finditer(before, 0))
+    candidates = list(_PLAYER_RE.finditer(before))
     if candidates:
         return candidates[-1].group()
+
+    after = text[idx + len("replacement") :]
+    after_candidates = list(_PLAYER_RE.finditer(after))
+    if after_candidates:
+        return after_candidates[0].group()
     return None
 
 
 def _find_nearest_name(fragment: str) -> str | None:
-    candidates = [(m.group(), m.start()) for m in _PLAYER_RE.finditer(fragment) if not _is_obviously_not_player(m.group())]
+    candidates = [
+        (m.group(), m.start()) for m in _PLAYER_RE.finditer(fragment) if not _is_obviously_not_player(m.group())
+    ]
     if not candidates:
         return None
     center = len(fragment) // 2
-    return min(candidates, key=lambda c: abs(c[1] - center))[0]
+    fragment_lower = fragment.lower()
+    scored: list[tuple[str, float]] = []
+    for name, pos in candidates:
+        dist = abs(pos - center)
+        score = float(dist)
+        for term in _CRICKET_CONTEXT_TERMS:
+            idx = fragment_lower.find(term)
+            if idx != -1:
+                term_dist = abs(pos - idx)
+                if term_dist < 80:
+                    score -= 60.0
+                    break
+        if any(word[0].isupper() and len(word) > 1 and word[0].isupper() for word in name.split()):
+            pass
+        if _INDIVIDUAL_PLAYER_INDICATORS.search(name):
+            score -= 40.0
+        scored.append((name, score))
+    scored.sort(key=lambda x: x[1])
+    return scored[0][0] if scored else None
+
+
+_INDIVIDUAL_PLAYER_INDICATORS = re.compile(
+    r"\b(?:Smith|Kohli|Dhoni|Sharma|Bumrah|Rahul|Pant|Gill|Pandya|Jadeja|"
+    r"Yadav|Ashwin|Shami|Dhawan|Chahal|Warner|Buttler|Maxwell|Russell|Narine|"
+    r"Khan|Curran|Stokes|Archer|Rabada|Boult|Samson|Iyer|Kishan|Karthik|"
+    r"Conway|Marsh|Green|David|Ali|Dube|Patidar|Rana|Shaw|Chahar|"
+    r"Natarajan|Malik|Rinku|Tilak|Samad|Shahbaz|Sundar|Sudharsan|"
+    r"Jaiswal|Parag|Jurel|Patel|Gaikwad|Rahane|Ravindra|Mitchell|"
+    r"Theekshana|Pathirana|Mustafizur|Thakur|Deshpande|Solanki|"
+    r"Suryakumar|Ishan|Hardik|Rohit|Virat|Shubman|Rishabh|"
+    r"Head|Klaasen|Salt|Starc|Nortje|Ferguson|Wood|"
+    r"Coetzee|Madhwal|Mhatre|Akash|Gerald)\b",
+    re.IGNORECASE,
+)
 
 
 def extract_effective_date(text: str, published_at: date) -> date | None:

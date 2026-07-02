@@ -198,3 +198,167 @@ class TestExtractEffectiveDate:
 
     def test_no_date_returns_none(self) -> None:
         assert extract_effective_date("no date mentioned", date(2026, 4, 1)) is None
+
+
+class TestPublisherRejection:
+    def test_cricinfo_rejected(self) -> None:
+        assert extract_player_name("Cricinfo") is None
+
+    def test_google_news_rejected(self) -> None:
+        assert extract_player_name("Google News") is None
+
+    def test_yahoo_sports_rejected(self) -> None:
+        assert extract_player_name("Yahoo Sports") is None
+
+    def test_sportstar_rejected(self) -> None:
+        assert extract_player_name("Sportstar") is None
+
+    def test_rediff_rejected(self) -> None:
+        assert extract_player_name("Rediff") is None
+
+    def test_generic_noun_rejected(self) -> None:
+        assert extract_player_name("Latest") is None
+        assert extract_player_name("This") is None
+        assert extract_player_name("Full") is None
+
+    def test_player_name_near_keyword_still_found(self) -> None:
+        assert extract_player_name("Virat Kohli ruled out") == "Virat Kohli"
+
+    def test_publisher_in_body_does_not_block_real_player(self) -> None:
+        text = "Cricinfo reports that MS Dhoni suffered a knee injury"
+        result = extract_player_name(text)
+        assert result is not None
+        assert "Dhoni" in result
+
+
+class TestReplacementExtraction:
+    def test_replaces_verb(self) -> None:
+        text = "Akash Madhwal replaces Ayush Mhatre"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Akash Madhwal"
+        assert outgoing == "Ayush Mhatre"
+
+    def test_replaces_middle_initial(self) -> None:
+        text = "Gerald Coetzee replaces David Payne"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Gerald Coetzee"
+        assert outgoing == "David Payne"
+
+    def test_signed_as_replacement_for(self) -> None:
+        text = "CSK signs Richard Gleeson as replacement for Deepak Chahar"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Richard Gleeson"
+        assert outgoing == "Deepak Chahar"
+
+    def test_named_as_replacement_for(self) -> None:
+        text = "MI names Lizaad Williams as replacement for Jasprit Bumrah"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Lizaad Williams"
+        assert outgoing == "Jasprit Bumrah"
+
+    def test_brought_in_for(self) -> None:
+        text = "RCB brings in Will Jacks for Glenn Maxwell"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Will Jacks"
+        assert outgoing == "Glenn Maxwell"
+
+    def test_drafted_in_for(self) -> None:
+        text = "KKR drafts in Rahmanullah Gurbaz for Phil Salt"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Rahmanullah Gurbaz"
+        assert outgoing == "Phil Salt"
+
+    def test_replacement_for_colon_format(self) -> None:
+        text = "replacement for MS Dhoni: Urvil Patel named in CSK squad"
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair(text)
+        assert incoming == "Urvil Patel"
+        assert outgoing == "MS Dhoni"
+
+    def test_self_replacement_returns_none(self) -> None:
+        from player_availability.parsers.rule_engine import _extract_replacement_pair
+
+        incoming, outgoing = _extract_replacement_pair("X replaces X")
+        assert incoming is None
+        assert outgoing is None
+
+
+class TestNewKeywords:
+    def test_withdraws_detected(self) -> None:
+        assert detect_event_type("withdraws from IPL") == EventType.RULED_OUT
+
+    def test_unavailable_detected(self) -> None:
+        assert detect_event_type("unavailable for selection") == EventType.RULED_OUT
+
+    def test_ruled_available_detected(self) -> None:
+        assert detect_event_type("ruled available for selection") == EventType.AVAILABLE_AGAIN
+
+    def test_replaces_detected(self) -> None:
+        assert detect_event_type("replaces injured player") == EventType.REPLACEMENT_SIGNED
+
+    def test_sidelined_detected(self) -> None:
+        assert detect_event_type("sidelined with injury") == EventType.INJURY
+
+    def test_will_miss_detected(self) -> None:
+        assert detect_event_type("will miss the season") == EventType.RULED_OUT
+
+    def test_roped_in_detected(self) -> None:
+        assert detect_event_type("roped in as replacement") == EventType.REPLACEMENT_SIGNED
+
+    def test_emergency_signing_detected(self) -> None:
+        assert detect_event_type("emergency signing for") == EventType.REPLACEMENT_SIGNED
+
+    def test_hurt_detected(self) -> None:
+        assert detect_event_type("hurt during training") == EventType.INJURY
+
+    def test_niggle_detected(self) -> None:
+        assert detect_event_type("hamstring niggle") == EventType.INJURY
+
+    def test_scan_detected(self) -> None:
+        assert detect_event_type("scan reveals injury") == EventType.INJURY
+
+    def test_surgery_detected(self) -> None:
+        assert detect_event_type("undergoes surgery") == EventType.INJURY
+
+    def test_back_in_training_detected(self) -> None:
+        assert detect_event_type("back in training") == EventType.RECOVERY
+
+    def test_in_contention_detected(self) -> None:
+        assert detect_event_type("in contention for selection") == EventType.RECOVERY
+
+    def test_close_to_return_detected(self) -> None:
+        assert detect_event_type("close to return from injury") == EventType.RECOVERY
+
+    def test_all_clear_detected(self) -> None:
+        assert detect_event_type("given all clear") == EventType.AVAILABLE_AGAIN
+
+    def test_passed_medical_detected(self) -> None:
+        assert detect_event_type("passed medical") == EventType.AVAILABLE_AGAIN
+
+    def test_rejoins_squad_detected(self) -> None:
+        assert detect_event_type("rejoins squad") == EventType.AVAILABLE_AGAIN
+
+    def test_international_break_detected(self) -> None:
+        assert detect_event_type("international break duty") == EventType.NATIONAL_DUTY
+
+    def test_family_emergency_detected(self) -> None:
+        assert detect_event_type("family emergency") == EventType.PERSONAL_LEAVE
+
+    def test_rotation_detected(self) -> None:
+        assert detect_event_type("rotation policy") == EventType.RESTED
+
+    def test_sanction_detected(self) -> None:
+        assert detect_event_type("handed a sanction") == EventType.SUSPENSION

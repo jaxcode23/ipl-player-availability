@@ -20,7 +20,7 @@ _SUSPENSION_HTML = "<p>Player X has been suspended for 2 matches for misconduct.
 _ILLNESS_HTML = "<p>Rohit Sharma misses training due to illness.</p>"
 _NON_AVAIL_HTML = "<p>Match preview: CSK vs MI in the upcoming clash at Wankhede.</p>"
 _EMPTY_HTML = ""
-_MULTIPLE_HTML = "<p>MS Dhoni has been ruled out due to injury. CSK signs Urvil Patel as replacement.</p>"
+_MULTIPLE_HTML = "<p>MS Dhoni has been ruled out due to injury. CSK signs Urvil Patel as replacement for MS Dhoni.</p>"
 
 
 @pytest.fixture
