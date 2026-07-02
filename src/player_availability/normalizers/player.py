@@ -72,6 +72,10 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Mohammad Nabi", "Nabi")
         self.register("Kieron Pollard", "Pollard", "K Pollard")
         self.register("Imran Tahir", "Tahir")
+        self.register("Keshav Maharaj", "Maharaj", "K Maharaj")
+        self.register("Ruchit Ahir", "Ahir", "R Ahir", "Ruchir Ahir")
+        self.register("Madushanka", "Dushmantha Madushanka")
+        self.register("Nuwan Thushara", "Thushara", "N Thushara")
         # CSK
         self.register("Ruturaj Gaikwad", "Gaikwad", "R Gaikwad")
         self.register("Tushar Deshpande", "Deshpande", "T Deshpande")
@@ -88,6 +92,11 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Nishant Sindhu", "Sindhu")
         self.register("Sameer Rizvi", "Rizvi")
         self.register("Aravelly Avanish", "Avanish")
+        self.register("Ayush Mhatre", "Mhatre", "A Mhatre")
+        self.register("Ramakrishna Ghosh", "Ghosh", "R Ghosh")
+        self.register("Dian Forrester", "Forrester", "D Forrester")
+        self.register("Macneil Noronha", "Noronha", "M Noronha")
+        self.register("Kuldip Yadav", "Kuldip")
         # MI
         self.register("Romario Shepherd", "Shepherd", "R Shepherd")
         self.register("Piyush Chawla", "P Chawla")
@@ -98,7 +107,7 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Naman Dhir", "Dhir")
         self.register("Gerald Coetzee", "Coetzee", "G Coetzee")
         self.register("Jason Behrendorff", "Behrendorff", "J Behrendorff")
-        self.register("Nuwan Thusara", "Thusara", "N Thusara")
+        self.register("Nuwan Thushara", "Thushara", "N Thushara")
         self.register("Shreyas Gopal", "S Gopal")
         # RCB
         self.register("Mohammed Siraj", "Siraj", "M Siraj")
@@ -116,6 +125,7 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Vijaykumar Vyshak", "Vyshak", "V Vyshak")
         self.register("Swapnil Singh", "Swapnil")
         self.register("Yash Dayal", "Dayal", "Y Dayal")
+        self.register("Wanindu Hasaranga", "Hasaranga", "W Hasaranga")
         # KKR
         self.register("Varun Chakravarthy", "Varun", "V Chakravarthy", "Chakravarthy")
         self.register("Ramandeep Singh", "Ramandeep")
@@ -132,6 +142,8 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Angkrish Raghuvanshi", "Raghuvanshi")
         self.register("Mujeeb Ur Rahman", "Mujeeb")
         self.register("Gus Atkinson", "Atkinson", "G Atkinson")
+        self.register("Luvnith Sisodia", "Sisodia", "L Sisodia")
+        self.register("Saurabh Dubey", "Dubey", "S Dubey")
         # SRH
         self.register("Kane Williamson", "Kane", "K Williamson")
         self.register("Jhye Richardson", "Richardson", "J Richardson")
@@ -148,6 +160,9 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Nithish Reddy", "Reddy", "N Reddy")
         self.register("Mayank Markande", "Markande", "M Markande")
         self.register("Jaydev Unadkat", "Unadkat", "J Unadkat")
+        self.register("Shivam Mavi", "Mavi", "S Mavi")
+        self.register("David Payne", "Payne", "D Payne")
+        self.register("RS Ambrish", "Ambrish")
         # RR
         self.register("Shimron Hetmyer", "Hetmyer", "S Hetmyer")
         self.register("Sandeep Sharma", "Sandeep")
@@ -157,10 +172,13 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Donovan Ferreira", "Ferreira")
         self.register("Adam Zampa", "Zampa", "A Zampa")
         self.register("Avesh Khan", "A Khan")
-        self.register("Shubham Dubey", "Dubey")
+        # NOTE: Bare "Dubey" alias is owned by Saurabh Dubey (KKR) above. Shubham
+        # Dubey (RR) shares the surname; the DB resolver disambiguates by team.
+        self.register("Shubham Dubey")
         self.register("Nandre Burger", "Burger", "N Burger")
         self.register("Tom Kohler-Cadmore", "Kohler-Cadmore")
         self.register("Rovman Powell", "Powell", "R Powell")
+        self.register("Emanjot Chahal", "Emanjot")
         # DC
         self.register("Axar Patel", "Axar", "A Patel")
         self.register("Anrich Nortje", "Nortje", "A Nortje")
@@ -182,7 +200,7 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Krunal Pandya", "K Pandya")
         self.register("Mark Wood", "Wood", "M Wood")
         self.register("Nicholas Pooran", "Pooran", "N Pooran", "Pooran")
-        self.register("Quinton de Kock", "de Kock", "Q de Kock")
+        self.register("Quinton de Kock", "de Kock", "Q de Kock", "Quinton")
         self.register("Ayush Badoni", "Badoni")
         self.register("Mohsin Khan", "M Khan")
         self.register("Yash Thakur", "Y Thakur")
@@ -224,6 +242,8 @@ class PlayerAliasRegistry(AliasRegistry):
         self.register("Spencer Johnson", "S Johnson")
         self.register("Azmatullah Omarzai", "Omarzai")
         self.register("Robin Minz", "Minz")
+        self.register("Connor Esterhuizen", "Esterhuizen", "C Esterhuizen")
+        self.register("Jacob Bethell", "Bethell")
 
 
 class PlayerNameNormalizer:

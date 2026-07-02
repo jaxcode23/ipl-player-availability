@@ -33,6 +33,30 @@ class TestPlayerAliasRegistry:
         registry = PlayerAliasRegistry()
         assert registry.resolve("MSD") == "MS Dhoni"
 
+    def test_quinton_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Quinton") == "Quinton de Kock"
+
+    def test_hasaranga_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Hasaranga") == "Wanindu Hasaranga"
+
+    def test_emanjot_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Emanjot") == "Emanjot Chahal"
+
+    def test_esterhuizen_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Esterhuizen") == "Connor Esterhuizen"
+
+    def test_bethell_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Bethell") == "Jacob Bethell"
+
+    def test_ruchir_ahir_resolves_to_ruchit(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Ruchir Ahir") == "Ruchit Ahir"
+
 
 class TestPlayerNameNormalizer:
     def test_full_name_passthrough(self) -> None:
