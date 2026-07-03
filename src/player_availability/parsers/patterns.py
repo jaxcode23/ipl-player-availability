@@ -617,6 +617,7 @@ HEADLINE_BOILERPLATE: set[str] = {
     "a former lucknow super giants",
     "a former punjab kings",
     "a former gujarat titans",
+    "world cup",
 }
 
 GENERIC_NOUNS: set[str] = {
@@ -654,6 +655,7 @@ GENERIC_NOUNS: set[str] = {
     "player",
     "league",
     "centre",
+    "who",
 }
 
 COUNTRY_NAMES: set[str] = {

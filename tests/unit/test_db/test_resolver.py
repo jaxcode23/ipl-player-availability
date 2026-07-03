@@ -89,3 +89,17 @@ def test_resolver_unknown_fails_cleanly(session):
     resolver = DbPlayerResolver(session)
     player_id = resolver.resolve("Unknown Player")
     assert player_id is None
+
+
+def test_resolver_wrong_team_retry_globally(session):
+    """A player on CSK should resolve even when asked with wrong team."""
+    resolver = DbPlayerResolver(session)
+    player_id = resolver.resolve("Virat Kohli", team_name="Mumbai Indians")
+    assert player_id is not None
+
+
+def test_resolver_ambiguous_globally_still_fails(session):
+    """Ambiguous name 'S Sharma' should still fail even with wrong team."""
+    resolver = DbPlayerResolver(session)
+    player_id = resolver.resolve("S Sharma", team_name="Mumbai Indians")
+    assert player_id is None

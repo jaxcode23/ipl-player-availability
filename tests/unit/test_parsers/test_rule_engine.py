@@ -680,3 +680,9 @@ class TestInvalidPlayerNameRejection:
 
     def test_indians_rejected_by_team_word(self) -> None:
         assert extract_player_name("Indians") is None
+
+    def test_who_rejected(self) -> None:
+        assert extract_player_name("Who") is None
+
+    def test_world_cup_rejected(self) -> None:
+        assert extract_player_name("World Cup") is None

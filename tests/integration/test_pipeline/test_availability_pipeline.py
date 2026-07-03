@@ -327,4 +327,9 @@ class TestAvailabilityPipeline:
     def test_db_player_resolver_returns_none_for_unknown(self, seeded_session):
         resolver = DbPlayerResolver(seeded_session)
         assert resolver.resolve("Nonexistent Player") is None
-        assert resolver.resolve("MS Dhoni", "Nonexistent Team") is None
+
+    def test_db_player_resolver_handles_wrong_team(self, seeded_session):
+        resolver = DbPlayerResolver(seeded_session)
+        assert resolver.resolve("Unknown Player", "Nonexistent Team") is None
+        dhoni_id = resolver.resolve("MS Dhoni", "Nonexistent Team")
+        assert dhoni_id is not None

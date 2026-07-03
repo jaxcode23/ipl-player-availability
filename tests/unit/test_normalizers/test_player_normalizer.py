@@ -57,6 +57,18 @@ class TestPlayerAliasRegistry:
         registry = PlayerAliasRegistry()
         assert registry.resolve("Ruchir Ahir") == "Ruchit Ahir"
 
+    def test_banton_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Banton") == "Tom Banton"
+
+    def test_dian_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Dian") == "Dian Forrester"
+
+    def test_thusara_resolves(self) -> None:
+        registry = PlayerAliasRegistry()
+        assert registry.resolve("Thusara") == "Nuwan Thushara"
+
 
 class TestPlayerNameNormalizer:
     def test_full_name_passthrough(self) -> None:

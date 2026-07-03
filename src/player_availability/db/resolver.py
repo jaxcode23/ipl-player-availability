@@ -24,8 +24,8 @@ class DbPlayerResolver(PlayerResolver):
         canonical = self._player_normalizer.normalize(player_name)
 
         # 1 & 2: Exact Canonical / Alias Registry match
-        stmt = select(PlayerModel).where(PlayerModel.name == canonical)
         canonical_team = None
+        stmt = select(PlayerModel).where(PlayerModel.name == canonical)
         if team_name:
             canonical_team = self._team_normalizer.normalize(team_name)
             stmt = stmt.join(PlayerModel.team).where(TeamModel.name == canonical_team)
@@ -35,6 +35,16 @@ class DbPlayerResolver(PlayerResolver):
             return players[0].id
         elif len(players) > 1:
             return None  # Ambiguous
+
+        # If team-filtered exact match found nothing, retry globally.
+        # The article's team context may not match the player's actual team.
+        if canonical_team and not players:
+            global_stmt = select(PlayerModel).where(PlayerModel.name == canonical)
+            global_players = self._session.scalars(global_stmt).all()
+            if len(global_players) == 1:
+                return global_players[0].id
+            elif len(global_players) > 1:
+                return None  # Ambiguous globally
 
         # If not found exactly, load candidates to try fallback strategies
         candidate_stmt = select(PlayerModel)
